@@ -37,16 +37,8 @@ jobs:
         run: bash scripts/windows/build-deps.sh
       - name: Executables
         run: bash scripts/build-windows.sh --runtime
-      - name: Probes and runtime tests (built)
-        run: bash scripts/build-windows.sh --tests
-      - name: ABI probe under Wine (diagnostic)
-        # Ubuntu 24.04's wine64 package installs the binary as `wine`; older ones as `wine64`.
-        # A diagnostic: the probe needs the toolchain's DLLs beside it, and Wine is not Windows.
-        continue-on-error: true
-        run: |
-          wine=$(command -v wine || command -v wine64)
-          cp out/windows/toolchain/llvm-mingw-*/x86_64-w64-mingw32/bin/{libwinpthread-1.dll,libc++.dll,libunwind.dll} out/windows/tests/ 2>/dev/null || true
-          WINEDEBUG=-all "$wine" out/windows/tests/abi_probe.exe
+      # The candidate archive comes before the test build: the executables are what a tester
+      # needs, and a diagnostic warning in a test program must not hold the artifact back.
       - name: Candidate archive
         run: BB_ALLOW_DIRTY=1 bash scripts/package-windows.sh
       - uses: actions/upload-artifact@v4
@@ -57,3 +49,13 @@ jobs:
             dist/SacredFire-windows-x86_64.zip.sha256
             dist/SacredFire-windows-x86_64.zip.build.txt
             out/windows/tests/*.exe
+      - name: Probes and runtime tests (built)
+        run: bash scripts/build-windows.sh --tests
+      - name: ABI probe under Wine (diagnostic)
+        # Ubuntu 24.04's wine64 package installs the binary as `wine`; older ones as `wine64`.
+        # A diagnostic: the probe needs the toolchain's DLLs beside it, and Wine is not Windows.
+        continue-on-error: true
+        run: |
+          wine=$(command -v wine || command -v wine64)
+          cp out/windows/toolchain/llvm-mingw-*/x86_64-w64-mingw32/bin/{libwinpthread-1.dll,libc++.dll,libunwind.dll} out/windows/tests/ 2>/dev/null || true
+          WINEDEBUG=-all "$wine" out/windows/tests/abi_probe.exe

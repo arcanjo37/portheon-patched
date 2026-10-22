@@ -523,7 +523,8 @@ static void ui_backpressure(void) {
     memcpy(image+0x1a3d134,call,sizeof(call));
     setenv("BB_UI_BACKPRESSURE_BUILDS","2",1); setenv("BB_UI_BACKPRESSURE_MS","50",1);
     runtime_ui_backpressure_init(image,size); assert(runtime_ui_build_site==(uintptr_t)image+0x1a3d145);
-    int scene, other; struct timespec t0;
+    /* Written by runtime_ui_before_build; initialized for -Wuninitialized-const-pointer. */
+    int scene=0, other=0; struct timespec t0;
     clock_gettime(CLOCK_MONOTONIC,&t0);
     for (int i=0;i<10;++i) runtime_ui_before_build(&scene); /* no flip yet: no renderer to wait for */
     runtime_ui_guest_flip();
