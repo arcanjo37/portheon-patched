@@ -220,6 +220,45 @@ static ABI __attribute__((noreturn)) void guest_libc_exit(int status) {
     runtime_report();
     exit(status);
 }
+/* ufc4: the 3.4.3 release implemented these imports; this source tree does not. UFC 4 imports
+ * them and stops the guest at the first one it calls ("STOP: first unsupported PS4 import",
+ * exit code 20) before the first frame, so the game never reached the GPU. A retail console
+ * without the matching service reports not-supported, and the game takes its offline path. */
+static ABI int32_t appcontent_pft_flag(uint32_t *flag) {
+    /* PlayStation Firmware Test: a retail console reports 0. */
+    if (flag) *flag = 0;
+    return 0;
+}
+static ABI int32_t kernel_is_prospero(void) { return 1; } /* the guest is the PS4 kernel */
+static ABI int32_t audioin_silent_state(uint32_t port, uint32_t *state) {
+    (void)port;
+    if (state) *state = 0;
+    return 0;
+}
+static ABI int32_t audioin_shared_device(void) { return 0; }
+static ABI int32_t service_not_supported(void) {
+    return (int32_t)UINT32_C(0x80020001); /* SCE_ERROR_NOT_SUPPORTED */
+}
+static uintptr_t optional_import(const char *name) {
+    if (runtime_nid_equals(name, "xmhnAoxN3Wk#libSceAppContentPft")) {
+        return (uintptr_t)appcontent_pft_flag;
+    }
+    if (runtime_nid_equals(name, "mpxAdqW7dKY")) return (uintptr_t)kernel_is_prospero;
+    if (runtime_nid_equals(name, "BohEAQ7DlUE")) return (uintptr_t)audioin_silent_state;
+    if (runtime_nid_equals(name, "6QP1MzdFWhs")) return (uintptr_t)audioin_shared_device;
+    /* Online, streaming, recording and remote play services the offline profile never provides. */
+    if (runtime_nid_equals(name, "K0QxEbD7q+c")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "WuuUhuKOxwQ")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "sAxbHhAWMXM")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "JT+t00a3TxA")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "rbknaUjpqWo")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "joRjtRXTFoc")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "k1SwgkMSOM8")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "mrNh78tBpmg")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "BOwybKVa3Do")) return (uintptr_t)service_not_supported;
+    if (runtime_nid_equals(name, "s28dalBwp2g")) return (uintptr_t)service_not_supported;
+    return 0;
+}
 uintptr_t runtime_resolve(const char *name, int is_data) {
     if (!(capabilities & 1)) return 0;
     if (is_data) {
@@ -252,6 +291,8 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (runtime_nid_equals(name,"p5EcQeEeJAE#libkernel")) return (uintptr_t)guest_set_heap_api;
     /* Everything else a libc import needs comes from the linked libc.prx itself. */
     if (libc_import(name)) return 0;
+    uintptr_t optional_imported = optional_import(name);
+    if (optional_imported) return optional_imported;
     uintptr_t mutex = runtime_mutex_resolve(name);
     if (mutex) return mutex;
     uintptr_t thread = runtime_thread_resolve(name);
