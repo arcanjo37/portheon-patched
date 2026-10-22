@@ -15,6 +15,16 @@ void runtime_restart(void) { abort(); }
 #include <unistd.h>
 #include <errno.h>
 
+#if defined(_WIN32)
+/* MinGW's C runtime has no POSIX setenv (only _putenv_s), so the Windows cross build of the
+ * tests failed with "call to undeclared function 'setenv'" (-Werror). The toggles below are
+ * read with getenv, which both runtimes provide. */
+static int setenv(const char *name, const char *value, int overwrite) {
+    (void)overwrite;
+    return _putenv_s(name, value);
+}
+#endif
+
 typedef int (ABI *Register)(GuestCallback);
 #ifdef __linux__
 /* Opt-in smoke for the signal sampler: no guest image or GPU execution. */
