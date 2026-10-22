@@ -175,6 +175,19 @@ Image::Image(const Vulkan::Instance& instance, Vulkan::Runtime& runtime_,
 
     usage_flags = ImageUsageFlags(instance, info);
     format_features = FormatFeatureFlags(usage_flags);
+    // ufc4 (Intel Arc B580): a multisampled image created without the storage usage. The driver
+    // reports only VK_SAMPLE_COUNT_1_BIT for the multisampled storage image combination, so the
+    // image used to be born single sampled while the pipeline rasterized four samples into it:
+    // the draw wrote out of bounds and the device was lost without a TDR (exit code 23).
+    if (info.num_samples > 1 && !(usage_flags & vk::ImageUsageFlagBits::eStorage)) {
+        static std::atomic<u32> notes{0};
+        if (notes.fetch_add(1, std::memory_order_relaxed) < 4) {
+            LOG_WARNING(Render_Vulkan,
+                        "multisampled image ({} samples) created without the storage usage: the "
+                        "device does not support multisampled storage images",
+                        info.num_samples);
+        }
+    }
     if (info.props.is_depth) {
         aspect_mask = vk::ImageAspectFlagBits::eDepth;
         if (info.props.has_stencil) {
